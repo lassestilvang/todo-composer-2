@@ -1,0 +1,2 @@
+-- Initial migration reference. Runtime initialization happens in src/db/client.ts
+-- Tables: lists, labels, tasks, subtasks, reminders, task_labels, task_history
