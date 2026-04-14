@@ -19,6 +19,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
   const [deadline, setDeadline] = useState("");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const quickDates = useMemo(() => {
     const today = new Date();
@@ -37,6 +38,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
   }
 
   function moveSubtask(from: number, to: number) {
+    if (to < 0 || to >= subtasks.length || from === to) return;
     setSubtasks((current) => {
       const next = [...current];
       const [item] = next.splice(from, 1);
@@ -46,37 +48,49 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
   }
 
   async function onSubmit(formData: FormData) {
-    setLoading(true);
-    const payload = {
-      listId: String(formData.get("listId") ?? "inbox"),
-      title: String(formData.get("title") ?? ""),
-      description: String(formData.get("description") ?? "") || null,
-      scheduledDate: scheduledDate || null,
-      deadline: deadline || null,
-      estimateMinutes: Number(formData.get("estimateMinutes") || 0) || null,
-      actualMinutes: Number(formData.get("actualMinutes") || 0) || null,
-      priority: String(formData.get("priority") ?? "none"),
-      recurring: String(formData.get("recurring") ?? "none"),
-      recurringRule: String(formData.get("recurringRule") ?? "") || null,
-      attachmentUrl: String(formData.get("attachmentUrl") ?? "") || null,
-      labelIds: selectedLabels,
-      subtasks: subtasks.map((item) => ({ title: item.title, completed: false })),
-      reminders,
-    };
+    try {
+      setLoading(true);
+      const payload = {
+        listId: String(formData.get("listId") ?? "inbox"),
+        title: String(formData.get("title") ?? ""),
+        description: String(formData.get("description") ?? "") || null,
+        scheduledDate: scheduledDate || null,
+        deadline: deadline || null,
+        estimateMinutes: Number(formData.get("estimateMinutes") || 0) || null,
+        actualMinutes: Number(formData.get("actualMinutes") || 0) || null,
+        priority: String(formData.get("priority") ?? "none"),
+        recurring: String(formData.get("recurring") ?? "none"),
+        recurringRule: String(formData.get("recurringRule") ?? "") || null,
+        attachmentUrl: String(formData.get("attachmentUrl") ?? "") || null,
+        labelIds: selectedLabels,
+        subtasks: subtasks.map((item) => ({ title: item.title, completed: false })),
+        reminders,
+      };
 
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    setLoading(false);
-    window.location.reload();
+      if (!response.ok) {
+        throw new Error("Could not save task");
+      }
+
+      setStatusMessage("Task saved");
+      window.setTimeout(() => window.location.reload(), 500);
+    } catch {
+      setStatusMessage("Failed to save task");
+    } finally {
+      setLoading(false);
+      window.setTimeout(() => setStatusMessage(null), 1400);
+    }
   }
 
   return (
     <form action={onSubmit} className="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
       <h3 className="text-sm font-medium">New Task</h3>
+      <p aria-live="polite" className="text-xs text-zinc-500">{statusMessage ?? " "}</p>
       <input id="new-task-title" name="title" placeholder="Task title" required className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
       <textarea name="description" placeholder="Description" className="min-h-20 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
 
@@ -164,7 +178,24 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
               }`}
             >
               <GripVertical className="h-4 w-4 text-zinc-500" />
-              <span className="flex-1">{item.title}</span>
+              <button
+                type="button"
+                className="flex-1 rounded px-1 py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                aria-label={`Subtask ${item.title}. Press Alt+Arrow to reorder.`}
+                onKeyDown={(event) => {
+                  if (!event.altKey) return;
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    moveSubtask(index, index - 1);
+                  }
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    moveSubtask(index, index + 1);
+                  }
+                }}
+              >
+                {item.title}
+              </button>
               <button type="button" className="pressable rounded p-1" onClick={() => setSubtasks((current) => current.filter((task) => task.id !== item.id))}>
                 <Trash2 className="h-4 w-4 text-zinc-500" />
               </button>
@@ -218,7 +249,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
           );
         })}
       </div>
-      <div className="sticky bottom-2 z-20 -mx-1 rounded-xl border border-zinc-200 bg-white/90 p-2 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 dark:border-zinc-700 dark:bg-zinc-900/90">
+      <div className="sticky bottom-2 z-20 -mx-1 rounded-xl border border-zinc-200 bg-white/90 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 dark:border-zinc-700 dark:bg-zinc-900/90">
         <button disabled={loading} className="pressable w-full rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto" type="submit">
           {loading ? "Saving..." : "Create task"}
         </button>

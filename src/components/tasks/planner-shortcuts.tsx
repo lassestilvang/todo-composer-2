@@ -62,7 +62,7 @@ export function PlannerShortcuts() {
         </div>
       ) : null}
       {toast ? (
-        <div className="pointer-events-none fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-2 text-xs text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+        <div aria-live="polite" className="pointer-events-none fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-2 text-xs text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
           {toast}
         </div>
       ) : null}
