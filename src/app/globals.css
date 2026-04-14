@@ -128,3 +128,26 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .pressable {
+    transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+    filter: brightness(0.96);
+  }
+
+  .drag-item {
+    transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  }
+
+  .drag-item--ghost {
+    opacity: 0.75;
+    transform: scale(0.985);
+    box-shadow: 0 10px 28px -16px rgb(124 58 237 / 0.65);
+  }
+}

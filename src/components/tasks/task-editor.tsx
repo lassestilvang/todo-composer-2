@@ -17,6 +17,8 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
   const [loading, setLoading] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const quickDates = useMemo(() => {
     const today = new Date();
@@ -82,7 +84,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
         <p className="mb-2 text-xs font-medium uppercase text-zinc-500">Schedule</p>
         <div className="mb-2 flex flex-wrap gap-2">
           {quickDates.map((chip) => (
-            <button key={chip.label} type="button" className="rounded-full border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700" onClick={() => setScheduledDate(chip.value)}>
+            <button key={chip.label} type="button" className="pressable rounded-full border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700" onClick={() => setScheduledDate(chip.value)}>
               {chip.label}
             </button>
           ))}
@@ -128,24 +130,42 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
         <p className="text-xs font-medium uppercase text-zinc-500">Subtasks (drag to reorder)</p>
         <div className="flex gap-2">
           <input value={subtaskDraft} onChange={(event) => setSubtaskDraft(event.target.value)} placeholder="Add subtask" className="flex-1 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700" />
-          <button type="button" className="rounded bg-zinc-200 p-2 dark:bg-zinc-700" onClick={addSubtask}><Plus className="h-4 w-4" /></button>
+          <button type="button" className="pressable rounded bg-zinc-200 p-2 dark:bg-zinc-700" onClick={addSubtask}><Plus className="h-4 w-4" /></button>
         </div>
         <ul className="space-y-2">
           {subtasks.map((item, index) => (
             <li
               key={item.id}
               draggable
-              onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))}
-              onDragOver={(event) => event.preventDefault()}
+              onDragStart={(event) => {
+                event.dataTransfer.setData("text/plain", String(index));
+                event.dataTransfer.effectAllowed = "move";
+                setDraggingId(item.id);
+              }}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setDropTargetId(null);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDropTargetId(item.id);
+              }}
               onDrop={(event) => {
                 const from = Number(event.dataTransfer.getData("text/plain"));
                 moveSubtask(from, index);
+                setDropTargetId(null);
               }}
-              className="flex items-center gap-2 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+              className={`drag-item flex items-center gap-2 rounded border px-2 py-1 text-sm dark:bg-zinc-800 ${
+                draggingId === item.id
+                  ? "drag-item--ghost border-violet-400 bg-violet-50 dark:border-violet-500 dark:bg-violet-900/20"
+                  : dropTargetId === item.id
+                    ? "border-sky-400 bg-sky-50 dark:border-sky-500 dark:bg-sky-900/20"
+                    : "border-zinc-200 bg-zinc-50 dark:border-zinc-700"
+              }`}
             >
               <GripVertical className="h-4 w-4 text-zinc-500" />
               <span className="flex-1">{item.title}</span>
-              <button type="button" onClick={() => setSubtasks((current) => current.filter((task) => task.id !== item.id))}>
+              <button type="button" className="pressable rounded p-1" onClick={() => setSubtasks((current) => current.filter((task) => task.id !== item.id))}>
                 <Trash2 className="h-4 w-4 text-zinc-500" />
               </button>
             </li>
@@ -159,7 +179,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
           <input type="datetime-local" value={reminderDraft} onChange={(event) => setReminderDraft(event.target.value)} className="flex-1 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700" />
           <button
             type="button"
-            className="rounded bg-zinc-200 px-3 py-1 text-sm dark:bg-zinc-700"
+            className="pressable rounded bg-zinc-200 px-3 py-1 text-sm dark:bg-zinc-700"
             onClick={() => {
               if (!reminderDraft) return;
               setReminders((current) => [...current, new Date(reminderDraft).toISOString()]);
@@ -173,7 +193,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
           {reminders.map((reminder) => (
             <li key={reminder} className="flex items-center justify-between rounded bg-zinc-100 px-2 py-1 dark:bg-zinc-800">
               <span>{new Date(reminder).toLocaleString()}</span>
-              <button type="button" onClick={() => setReminders((current) => current.filter((item) => item !== reminder))}>Remove</button>
+              <button type="button" className="pressable rounded px-1 py-0.5" onClick={() => setReminders((current) => current.filter((item) => item !== reminder))}>Remove</button>
             </li>
           ))}
         </ul>
@@ -198,9 +218,11 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
           );
         })}
       </div>
-      <button disabled={loading} className="w-full rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto" type="submit">
-        {loading ? "Saving..." : "Create task"}
-      </button>
+      <div className="sticky bottom-2 z-20 -mx-1 rounded-xl border border-zinc-200 bg-white/90 p-2 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 dark:border-zinc-700 dark:bg-zinc-900/90">
+        <button disabled={loading} className="pressable w-full rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto" type="submit">
+          {loading ? "Saving..." : "Create task"}
+        </button>
+      </div>
     </form>
   );
 }
