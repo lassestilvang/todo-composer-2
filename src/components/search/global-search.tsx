@@ -28,10 +28,11 @@ export function GlobalSearch() {
   return (
     <div className="space-y-2">
       <input
+        id="global-search-input"
         value={query}
         onChange={(event) => void runSearch(event.target.value)}
         className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        placeholder="Search tasks, lists, labels..."
+        placeholder="Search tasks, lists, labels... (Press /)"
       />
       {results.length > 0 ? (
         <div className="rounded-md border border-zinc-200 p-2 dark:border-zinc-700">

@@ -1,15 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { addDays, format } from "date-fns";
+import { useMemo, useState } from "react";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
 
 type ListItem = { id: string; name: string; emoji: string };
 type LabelItem = { id: string; name: string; icon: string };
+type SubtaskItem = { id: string; title: string };
 
 export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: LabelItem[] }) {
-  const [subtasksText, setSubtasksText] = useState("");
-  const [remindersText, setRemindersText] = useState("");
+  const [subtasks, setSubtasks] = useState<SubtaskItem[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = useState("");
+  const [reminders, setReminders] = useState<string[]>([]);
+  const [reminderDraft, setReminderDraft] = useState("");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [deadline, setDeadline] = useState("");
+
+  const quickDates = useMemo(() => {
+    const today = new Date();
+    return [
+      { label: "Today", value: format(today, "yyyy-MM-dd") },
+      { label: "Tomorrow", value: format(addDays(today, 1), "yyyy-MM-dd") },
+      { label: "Next Week", value: format(addDays(today, 7), "yyyy-MM-dd") },
+    ];
+  }, []);
+
+  function addSubtask() {
+    const title = subtaskDraft.trim();
+    if (!title) return;
+    setSubtasks((current) => [...current, { id: crypto.randomUUID(), title }]);
+    setSubtaskDraft("");
+  }
+
+  function moveSubtask(from: number, to: number) {
+    setSubtasks((current) => {
+      const next = [...current];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
 
   async function onSubmit(formData: FormData) {
     setLoading(true);
@@ -17,8 +49,8 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
       listId: String(formData.get("listId") ?? "inbox"),
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? "") || null,
-      scheduledDate: String(formData.get("scheduledDate") ?? "") || null,
-      deadline: String(formData.get("deadline") ?? "") || null,
+      scheduledDate: scheduledDate || null,
+      deadline: deadline || null,
       estimateMinutes: Number(formData.get("estimateMinutes") || 0) || null,
       actualMinutes: Number(formData.get("actualMinutes") || 0) || null,
       priority: String(formData.get("priority") ?? "none"),
@@ -26,12 +58,8 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
       recurringRule: String(formData.get("recurringRule") ?? "") || null,
       attachmentUrl: String(formData.get("attachmentUrl") ?? "") || null,
       labelIds: selectedLabels,
-      subtasks: subtasksText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((title) => ({ title, completed: false })),
-      reminders: remindersText.split("\n").map((line) => line.trim()).filter(Boolean),
+      subtasks: subtasks.map((item) => ({ title: item.title, completed: false })),
+      reminders,
     };
 
     await fetch("/api/tasks", {
@@ -47,12 +75,24 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
   return (
     <form action={onSubmit} className="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
       <h3 className="text-sm font-medium">New Task</h3>
-      <input name="title" placeholder="Task title" required className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
+      <input id="new-task-title" name="title" placeholder="Task title" required className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
       <textarea name="description" placeholder="Description" className="min-h-20 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
-      <div className="grid gap-2 md:grid-cols-2">
-        <input type="date" name="scheduledDate" className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
-        <input type="date" name="deadline" className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
+
+      <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+        <p className="mb-2 text-xs font-medium uppercase text-zinc-500">Schedule</p>
+        <div className="mb-2 flex flex-wrap gap-2">
+          {quickDates.map((chip) => (
+            <button key={chip.label} type="button" className="rounded-full border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700" onClick={() => setScheduledDate(chip.value)}>
+              {chip.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <input type="date" name="scheduledDate" value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
+          <input type="date" name="deadline" value={deadline} onChange={(event) => setDeadline(event.target.value)} className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
+        </div>
       </div>
+
       <div className="grid gap-2 md:grid-cols-2">
         <input type="number" name="estimateMinutes" placeholder="Estimate (minutes)" className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
         <input type="number" name="actualMinutes" placeholder="Actual (minutes)" className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
@@ -83,8 +123,62 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
         <input name="recurringRule" placeholder="Custom recurrence rule" className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
       </div>
       <input name="attachmentUrl" placeholder="Attachment URL" className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
-      <textarea value={subtasksText} onChange={(event) => setSubtasksText(event.target.value)} placeholder="Subtasks, one per line" className="min-h-16 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
-      <textarea value={remindersText} onChange={(event) => setRemindersText(event.target.value)} placeholder="Reminder ISO timestamps, one per line" className="min-h-16 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700" />
+
+      <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+        <p className="text-xs font-medium uppercase text-zinc-500">Subtasks (drag to reorder)</p>
+        <div className="flex gap-2">
+          <input value={subtaskDraft} onChange={(event) => setSubtaskDraft(event.target.value)} placeholder="Add subtask" className="flex-1 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700" />
+          <button type="button" className="rounded bg-zinc-200 p-2 dark:bg-zinc-700" onClick={addSubtask}><Plus className="h-4 w-4" /></button>
+        </div>
+        <ul className="space-y-2">
+          {subtasks.map((item, index) => (
+            <li
+              key={item.id}
+              draggable
+              onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const from = Number(event.dataTransfer.getData("text/plain"));
+                moveSubtask(from, index);
+              }}
+              className="flex items-center gap-2 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+            >
+              <GripVertical className="h-4 w-4 text-zinc-500" />
+              <span className="flex-1">{item.title}</span>
+              <button type="button" onClick={() => setSubtasks((current) => current.filter((task) => task.id !== item.id))}>
+                <Trash2 className="h-4 w-4 text-zinc-500" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+        <p className="text-xs font-medium uppercase text-zinc-500">Reminders</p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input type="datetime-local" value={reminderDraft} onChange={(event) => setReminderDraft(event.target.value)} className="flex-1 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700" />
+          <button
+            type="button"
+            className="rounded bg-zinc-200 px-3 py-1 text-sm dark:bg-zinc-700"
+            onClick={() => {
+              if (!reminderDraft) return;
+              setReminders((current) => [...current, new Date(reminderDraft).toISOString()]);
+              setReminderDraft("");
+            }}
+          >
+            Add reminder
+          </button>
+        </div>
+        <ul className="space-y-1 text-xs text-zinc-500">
+          {reminders.map((reminder) => (
+            <li key={reminder} className="flex items-center justify-between rounded bg-zinc-100 px-2 py-1 dark:bg-zinc-800">
+              <span>{new Date(reminder).toLocaleString()}</span>
+              <button type="button" onClick={() => setReminders((current) => current.filter((item) => item !== reminder))}>Remove</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {labels.map((label) => {
           const checked = selectedLabels.includes(label.id);
@@ -104,7 +198,7 @@ export function TaskEditor({ lists, labels }: { lists: ListItem[]; labels: Label
           );
         })}
       </div>
-      <button disabled={loading} className="rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit">
+      <button disabled={loading} className="w-full rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto" type="submit">
         {loading ? "Saving..." : "Create task"}
       </button>
     </form>

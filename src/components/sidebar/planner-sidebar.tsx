@@ -9,12 +9,12 @@ const views = [
   { href: "/all", label: "All" },
 ];
 
-export function PlannerSidebar({ overdueCount }: { overdueCount: number }) {
+export function PlannerSidebar({ overdueCount, className = "" }: { overdueCount: number; className?: string }) {
   const lists = getLists() as Array<{ id: string; name: string; emoji: string; color: string; is_inbox: number }>;
   const labels = getLabels() as Array<{ id: string; name: string; icon: string; color: string }>;
 
   return (
-    <aside className="flex flex-col gap-6 border-r border-zinc-200 p-4 dark:border-zinc-800">
+    <aside className={`flex flex-col gap-6 p-4 ${className}`}>
       <h1 className="text-xl font-semibold tracking-tight">Daily Planner</h1>
       <section className="space-y-2">
         <h2 className="text-xs uppercase text-zinc-500">Views</h2>
